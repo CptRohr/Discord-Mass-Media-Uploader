@@ -8,6 +8,7 @@ import config
 LARGE_MEDIA = ""
 CONTENT_FOLDER = ""
 LOG_FILE = ""
+MAX_FILES_PER_MESSAGE = 10
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -63,6 +64,88 @@ def uploaded_filenames():
     return uploaded
 
 
+def should_skip_file(filename):
+    return filename.startswith(".")
+
+
+def file_info(file_path):
+    filesize = os.path.getsize(file_path) / (1024 * 1024)
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    return filesize, current_time
+
+
+def log_uploaded_file(log_file, filename, filesize, current_time):
+    log_file.write(f"{current_time} {filesize:10.2f}    {filename}\n")
+    print(f"Uploaded: {current_time} {filesize:6.2f} MB  {filename}")
+
+
+def move_to_large(file_path, filename):
+    large_file_path = os.path.join(LARGE_MEDIA, filename)
+    shutil.move(file_path, large_file_path)
+    print(f"Too large: {filename}")
+
+
+def chunk_files(files, chunk_size):
+    for index in range(0, len(files), chunk_size):
+        yield files[index:index + chunk_size]
+
+
+async def send_single_file(channel, log_file, upload):
+    filename = upload["filename"]
+    file_path = upload["path"]
+    discord_file = None
+
+    try:
+        filesize, current_time = file_info(file_path)
+        discord_file = discord.File(file_path, filename)
+        await channel.send(file=discord_file)
+        log_uploaded_file(log_file, filename, filesize, current_time)
+        return True
+    except Exception as e:
+        if "Payload Too Large" in str(e):
+            move_to_large(file_path, filename)
+        else:
+            print(f"Failed to upload {filename}: {e}")
+
+        return False
+    finally:
+        if discord_file:
+            discord_file.close()
+
+
+async def send_file_batch(channel, log_file, uploads):
+    discord_files = []
+
+    try:
+        for upload in uploads:
+            discord_files.append(discord.File(upload["path"], upload["filename"]))
+
+        await channel.send(files=discord_files)
+
+        for upload in uploads:
+            filesize, current_time = file_info(upload["path"])
+            log_uploaded_file(log_file, upload["filename"], filesize, current_time)
+
+        return len(uploads), 0
+    except Exception as e:
+        print(f"Batch upload failed, retrying one by one: {e}")
+
+        uploaded_count = 0
+        failed_count = 0
+
+        for upload in uploads:
+            if await send_single_file(channel, log_file, upload):
+                uploaded_count += 1
+            else:
+                failed_count += 1
+
+        return uploaded_count, failed_count
+    finally:
+        for discord_file in discord_files:
+            discord_file.close()
+
+
 @bot.event
 async def on_ready():
     print('Logged in as {0.user}'.format(bot))
@@ -104,37 +187,31 @@ async def kaboom(ctx, mode: str = ""):
     uploaded_count = 0
     skipped_count = 0
     failed_count = 0
+    uploads = []
+
+    for filename in os.listdir(CONTENT_FOLDER):
+        file_path = os.path.join(CONTENT_FOLDER, filename)
+
+        if not os.path.isfile(file_path):
+            continue
+
+        if should_skip_file(filename):
+            continue
+
+        if not upload_all and filename in logs:
+            skipped_count += 1
+            continue
+
+        uploads.append({
+            "filename": filename,
+            "path": file_path
+        })
 
     with open(LOG_FILE, 'a') as file:
-        for filename in os.listdir(CONTENT_FOLDER):
-            file_path = os.path.join(CONTENT_FOLDER, filename)
-
-            if not os.path.isfile(file_path):
-                continue
-
-            if not upload_all and filename in logs:
-                skipped_count += 1
-                continue
-
-            try:
-                filesize = os.path.getsize(file_path) / (1024 * 1024)
-                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-                await channel.send(file=discord.File(file_path, filename))
-
-                file.write(f"{current_time} {filesize:10.2f}    {filename}\n")
-                uploaded_count += 1
-                print(f"Uploaded: {current_time} {filesize:6.2f} MB  {filename}")
-
-            except Exception as e:
-                failed_count += 1
-
-                if "Payload Too Large" in str(e):
-                    large_file_path = os.path.join(LARGE_MEDIA, filename)
-                    shutil.move(file_path, large_file_path)
-                    print(f"Too large: {filename}")
-                else:
-                    print(f"Failed to upload {filename}: {e}")
+        for upload_batch in chunk_files(uploads, MAX_FILES_PER_MESSAGE):
+            batch_uploaded_count, batch_failed_count = await send_file_batch(channel, file, upload_batch)
+            uploaded_count += batch_uploaded_count
+            failed_count += batch_failed_count
 
     if uploaded_count:
         await channel.send(f"Uploaded {uploaded_count} file(s).")
@@ -156,6 +233,7 @@ def logo():
     line4 = "██. ██ ▐█▌▐█▄▪▐█▐███▌▐█▌.▐▌▐█•█▌██. ██     ██ ██▌▐█▌▐█▄▄▌██. ██ ▐█▌▐█ ▪▐▌    ▐▌▐█▌▐█▄▄▌ ▐█▌·"
     line5 = "▀▀▀▀▀• ▀▀▀ ▀▀▀▀ ·▀▀▀  ▀█▄▀▪.▀  ▀▀▀▀▀▀•     ▀▀  █▪▀▀▀ ▀▀▀ ▀▀▀▀▀• ▀▀▀ ▀  ▀      ▀▀▀• ▀▀▀  ▀▀▀ "
     information = "    ⭐️ Star the Repository  |  https://github.com/Nikhil-Makwana1/DiscordMediaUploader ⭐️    "
+    credit = "    Modified by CptRohr  |  https://github.com/CptRohr    "
 
     console_width = shutil.get_terminal_size().columns
     center_offset = (console_width - len(line1)) // 2
@@ -168,6 +246,7 @@ def logo():
     print(" " * center_offset + line5)
     print()
     print(" " * center_offset + information)
+    print(" " * center_offset + credit)
     print()
 
 

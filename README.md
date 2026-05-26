@@ -1,69 +1,74 @@
 # Discord Media Uploader
 
-Discord Media Uploader is a small Python Discord bot for uploading every file in a local `media` folder to the Discord channel where you run a command.
+Discord Media Uploader is a small Python Discord bot that uploads files from a local `media` folder to the Discord channel where you run a command.
 
-It is useful when you have a batch of images, videos, documents, or other files that you want to send to a server without manually attaching them one by one.
+Use it when you have a batch of images, videos, documents, or other files that you want to send without manually attaching them one by one.
 
-## How It Works
+## What It Does
 
-The bot does not watch the folder automatically. Instead, you run a Discord command when you are ready to upload.
+- Uploads files from the `media` folder when you run `!kaboom`.
+- Sends files in batches of up to 10 attachments per Discord message.
+- Skips files that are already listed in `logs.log`.
+- Can resend everything with `!kaboom all`.
+- Can reset upload history with `!kaboom reset`.
+- Moves files Discord rejects as too large into the `large` folder.
+- Ignores hidden files such as `.gitkeep`.
 
-- Put files inside the `media` folder.
-- Start the bot.
-- In Discord, type `!kaboom` in the channel where the files should be sent.
-- The bot uploads files that have not already been recorded in `logs.log`.
-- Files that are too large for Discord are moved to the `large` folder.
+The bot does not automatically watch the folder. It only uploads when you run a command in Discord.
 
 ## Requirements
 
 - Python 3.8 or newer
 - A Discord bot token
-- The bot must be invited to your server
-- The bot needs permission to read messages, send messages, and attach files
-- Message Content Intent must be enabled in the Discord Developer Portal
+- The bot invited to your Discord server
+- Discord bot permissions:
+  - View Channels
+  - Send Messages
+  - Attach Files
+  - Read Message History
+- Message Content Intent enabled in the Discord Developer Portal
 
-## Installation
+See [bottutorial.md](./bottutorial.md) if you need help creating and inviting the bot.
+
+## Quick Start
 
 1. Clone or download this repository.
-2. Install the required Python package:
+
+2. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Create a Discord bot in the Discord Developer Portal.
+3. Create and invite your Discord bot.
 
-See [bottutorial.md](./bottutorial.md) for a step-by-step guide.
+Follow [bottutorial.md](./bottutorial.md), then copy your bot token.
 
-4. Set your bot token as an environment variable.
+4. Set your bot token.
 
-PowerShell:
+For a temporary PowerShell session:
 
 ```powershell
 $env:DISCORD_BOT_TOKEN = "your-bot-token-here"
 ```
 
-Command Prompt:
+For a persistent Windows user environment variable:
 
-```bat
-set DISCORD_BOT_TOKEN=your-bot-token-here
+```powershell
+setx DISCORD_BOT_TOKEN "your-bot-token-here"
 ```
 
-Linux or macOS:
+After using `setx`, close and reopen PowerShell. If you run the bot from VS Code, restart VS Code too.
 
-```bash
-export DISCORD_BOT_TOKEN="your-bot-token-here"
+To confirm the current PowerShell can see the token:
+
+```powershell
+echo $env:DISCORD_BOT_TOKEN
 ```
 
-The project also includes `config.example.py` to show how the token is loaded:
+If that prints nothing, the bot will ask for the token when it starts.
 
-```python
-TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
-```
-
-Keep this token private. If it is shared publicly, reset it immediately in the Discord Developer Portal.
-
-5. Add your files to the `media` folder.
+5. Put your files in the `media` folder.
 
 6. Start the bot:
 
@@ -71,33 +76,70 @@ Keep this token private. If it is shared publicly, reset it immediately in the D
 python DiscordMediaUploader.py
 ```
 
-## Discord Commands
+7. In Discord, go to the channel where you want the files uploaded and run:
 
-Run these commands in the Discord channel where you want the files to be uploaded.
+```text
+!kaboom
+```
+
+## Commands
 
 ### `!kaboom`
 
-Uploads files from the `media` folder that are not already listed in `logs.log`.
+Uploads files from `media` that are not already listed in `logs.log`.
 
-Use this for normal uploads. If a file was already uploaded before, the bot skips it so you do not accidentally post duplicates.
+Use this for normal uploads. Files are sent in batches of up to 10 attachments per message.
+
+Batching works like this:
+
+- The bot collects all uploadable files.
+- It splits them into groups of up to 10 files.
+- It tries to send each group as one Discord message.
+- If a batch fails, the bot retries that group one file at a time.
+
+This means uploads may sometimes appear as one message with multiple files, and sometimes as separate messages. Separate messages usually mean Discord rejected the batch because of file size, total attachment size, file type, rate limits, or a temporary API issue.
 
 ### `!kaboom all`
 
-Uploads every file currently in the `media` folder, even if it already appears in `logs.log`.
+Uploads every file currently in `media`, even if it already appears in `logs.log`.
 
-Use this if you want to resend files.
+Use this when you want to resend files.
 
 ### `!kaboom reset`
 
-Clears the upload log.
+Clears the upload history in `logs.log`.
 
-After running this, `!kaboom` will treat the files in `media` as new again.
+After this, `!kaboom` will treat files in `media` as new again.
 
-## Folders And Files
+## Token Safety
+
+Never paste your real bot token into:
+
+- `config.py`
+- GitHub commits
+- Discord messages
+- Screenshots
+- README files
+
+This project reads the token from the `DISCORD_BOT_TOKEN` environment variable:
+
+```python
+TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
+```
+
+The included `config.py` is safe to commit because it does not contain a real token.
+
+If your token is ever exposed, reset it immediately in the Discord Developer Portal.
+
+You can use a local `.env` file with your own workflow if you prefer. `.env` files are ignored by Git in this project, but do not upload them manually to GitHub.
+
+## Project Folders
 
 ### `media`
 
-Put files here before running the upload command.
+Put files here before running `!kaboom`.
+
+Files beginning with `.` are ignored by the bot. The `.gitkeep` file only exists so GitHub keeps the folder in the repository.
 
 ### `large`
 
@@ -105,17 +147,17 @@ Files that Discord rejects as too large are moved here.
 
 ### `logs.log`
 
-The bot creates this file when it starts and records uploaded files here. This is how it knows which files have already been sent.
+The bot creates this file when it starts. It records uploaded files so the bot can skip duplicates later.
 
-If `!kaboom` says there are no remaining files, it usually means every file in `media` is already listed in `logs.log`.
+If `!kaboom` says there are no remaining files, every uploadable file in `media` is probably already listed in `logs.log`.
 
-You can either run:
+To resend them:
 
 ```text
 !kaboom all
 ```
 
-or:
+To clear upload history first:
 
 ```text
 !kaboom reset
@@ -123,6 +165,18 @@ or:
 ```
 
 ## Troubleshooting
+
+### The bot asks for my token even after using `setx`
+
+`setx` only affects new terminals and newly opened apps.
+
+Close and reopen PowerShell, then check:
+
+```powershell
+echo $env:DISCORD_BOT_TOKEN
+```
+
+If you run the bot from VS Code, restart VS Code too.
 
 ### The bot receives my command but sends nothing
 
@@ -140,17 +194,35 @@ Make sure:
 - The bot has permission to read messages, send messages, and attach files.
 - The command starts with `!`, for example `!kaboom`.
 
+### `.gitkeep` was uploaded
+
+Update to the latest version of this project. The bot now ignores files beginning with `.`.
+
 ### A file is not uploaded
 
 The file may be too large for Discord. Check the `large` folder and the console output.
 
-## Notes
+If a batch fails, the bot retries those files one by one. This helps it find the specific file that failed without stopping the whole upload.
 
-- Discord upload limits depend on the server and account level.
-- The bot only uploads local files from the `media` folder.
-- `media`, `large`, `logs.log`, `.env`, and virtual environments are ignored by Git.
-- Do not commit real bot tokens to GitHub or share them in screenshots.
+## GitHub Notes
+
+The following are ignored by Git:
+
+- `media/*`
+- `large/*`
+- `logs.log`
+- `.env`
+- `.venv`
+- `__pycache__`
+
+Do not manually upload private media files, `.env` files, or real tokens through GitHub's website.
 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
+
+## Credits
+
+Original project by [Nikhil-Makwana1](https://github.com/Nikhil-Makwana1/DiscordMediaUploader).
+
+Modified by [CptRohr](https://github.com/CptRohr).
