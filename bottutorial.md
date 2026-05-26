@@ -1,32 +1,50 @@
+# Discord Bot Setup
 
-# Discord Bot Creation and Adding it to Your Server
+This guide shows how to create a Discord bot, enable the required intents, and invite it to your server.
 
+## Step 1: Create A Discord Application
 
-## Step 1: Creating a Discord Application
-1. Visit the **[Discord Developer Portal](https://discord.com/developers/applications)** and log in with your Discord account.
-2. Click on the `New Application` button to create a new application for your bot.
-3. Enter a catchy name for your application and click `Create`.
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Click **New Application**.
+3. Enter a name for the application.
+4. Click **Create**.
 
-## Step 2: Creating a Bot for Your Application
-1. In the left sidebar, navigate to the **Bot** section under **Settings**.
-2. Click on the `Add Bot` button to bring your application to life!
-3. Under the **Token** section, click on the `Copy` button to save your bot token securely.
+## Step 2: Create The Bot User
 
-## Step 3: Empowering Your Bot with Required Intents
-1. Still in the **Bot** section, scroll down to the **Privileged Gateway Intents** area.
-2. Enable the following powerful intents:
-   - ☑️ Server Members Intent
-   - ☑️ Message Content Intent
-   > Note: These intents may require verification for bots in 100 or more servers.
+1. Open your application in the Developer Portal.
+2. Go to **Bot** in the left sidebar.
+3. Click **Add Bot** if a bot user has not already been created.
+4. Under **Token**, click **Reset Token** or **Copy Token**.
+5. Store the token somewhere private.
 
-## Step 4: Configuring Bot Permissions
-1. Explore the **OAuth2** section in the left sidebar, under **Settings**.
-2. Scroll down to the **Scopes** area and select the `bot` checkbox.
-3. Delve into the **Bot Permissions** section and choose the permissions your bot needs. Make sure to include the **Attach Files** permission for uploading attachments.
-4. Voilà! A unique URL will be generated. Copy this URL for the next step.
+Never commit your bot token to GitHub. If a token is exposed, reset it immediately.
 
-## Step 5: Inviting Your Bot to Your Server
-1. Open a new browser tab and paste the copied URL. This will whisk you away to a page where you can integrate your bot into your server.
-2. Select the desired server where you want to unleash your bot's potential, then click **"Authorize"**. Complete any additional verification steps if prompted.
+## Step 3: Enable Required Intents
 
-> Remember: Treat your bot token like a secret artifact! Safeguard it from prying eyes and avoid sharing it publicly or committing it to public repositories.
+In the **Bot** page, scroll to **Privileged Gateway Intents** and enable:
+
+- **Server Members Intent**
+- **Message Content Intent**
+
+Message Content Intent is required because this bot listens for commands such as `!kaboom`.
+
+## Step 4: Generate An Invite Link
+
+1. Go to **OAuth2**.
+2. Open **URL Generator**.
+3. Under **Scopes**, select **bot**.
+4. Under **Bot Permissions**, select:
+   - **View Channels**
+   - **Send Messages**
+   - **Attach Files**
+   - **Read Message History**
+5. Copy the generated URL.
+
+## Step 5: Invite The Bot
+
+1. Open the generated URL in your browser.
+2. Select your Discord server.
+3. Click **Authorize**.
+4. Complete any verification prompts.
+
+After the bot is invited, start `DiscordMediaUploader.py` and run `!kaboom` in the channel where you want files uploaded.

@@ -1,1 +1,3 @@
-TOKEN = "" # add your bot token here
+import os
+
+TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")

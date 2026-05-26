@@ -8,7 +8,6 @@ import config
 LARGE_MEDIA = ""
 CONTENT_FOLDER = ""
 LOG_FILE = ""
-COMMAND_EXECUTED = False
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -45,46 +44,109 @@ def prerequisite():
             file.write("----------------------------------------\n")
 
 
+def reset_log_file():
+    with open(LOG_FILE, 'w') as file:
+        file.write("----------------------------------------\n")
+        file.write("        Time           Size (MB)    Name\n")
+        file.write("----------------------------------------\n")
+
+
+def uploaded_filenames():
+    uploaded = set()
+
+    with open(LOG_FILE, 'r') as file:
+        for line in file:
+            parts = line.rstrip().split(maxsplit=4)
+            if len(parts) == 5:
+                uploaded.add(parts[4])
+
+    return uploaded
+
+
 @bot.event
 async def on_ready():
     print('Logged in as {0.user}'.format(bot))
     print("To start uploading, type !kaboom in the Discord channel")
 
 
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+    print(f"Received message from {message.author}: {message.content}")
+    await bot.process_commands(message)
+
+
+@bot.event
+async def on_command_error(ctx, error):
+    print(f"Command error: {getattr(ctx.command, 'name', None)} failed with: {error}")
+
+
 @bot.command()
-async def kaboom(ctx):
-    global COMMAND_EXECUTED
+async def kaboom(ctx, mode: str = ""):
+    print(f"kaboom command invoked by {ctx.author} in {ctx.channel}")
+    channel = ctx.channel
 
-    if not COMMAND_EXECUTED:
-        COMMAND_EXECUTED = True
-        channel = ctx.channel
+    mode = mode.lower()
+    upload_all = mode in ("all", "--all", "force", "--force")
 
-        with open(LOG_FILE, 'r') as file:
-            logs = file.read()
+    if mode in ("reset", "--reset"):
+        reset_log_file()
+        print("Upload log reset")
+        await channel.send("Upload log reset. Run `!kaboom` to upload files again.")
+        return
 
-        with open(LOG_FILE, 'a') as file:
-            for filename in os.listdir(CONTENT_FOLDER):
+    if mode and not upload_all:
+        await channel.send("Unknown option. Use `!kaboom`, `!kaboom all`, or `!kaboom reset`.")
+        return
 
-                file_path = os.path.join(CONTENT_FOLDER, filename)
+    logs = uploaded_filenames()
+    uploaded_count = 0
+    skipped_count = 0
+    failed_count = 0
 
-                if os.path.isfile(file_path) and filename not in logs:
-                    try:
-                        filesize = os.path.getsize(file_path) / (1024 * 1024)
-                        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, 'a') as file:
+        for filename in os.listdir(CONTENT_FOLDER):
+            file_path = os.path.join(CONTENT_FOLDER, filename)
 
-                        await channel.send(file=discord.File(file_path, filename))
+            if not os.path.isfile(file_path):
+                continue
 
-                        file.write(f"{current_time} {filesize:10.2f}    {filename}\n")
-                        print(f"Uploaded: {current_time} {filesize:6.2f} MB  {filename}")
+            if not upload_all and filename in logs:
+                skipped_count += 1
+                continue
 
-                    except Exception as e:
-                        large_file_path = os.path.join(LARGE_MEDIA, filename)
-                        shutil.move(file_path, large_file_path)
+            try:
+                filesize = os.path.getsize(file_path) / (1024 * 1024)
+                current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                        if "Payload Too Large" in str(e):
-                            print(f"Too large: {filename}")
+                await channel.send(file=discord.File(file_path, filename))
 
+                file.write(f"{current_time} {filesize:10.2f}    {filename}\n")
+                uploaded_count += 1
+                print(f"Uploaded: {current_time} {filesize:6.2f} MB  {filename}")
+
+            except Exception as e:
+                failed_count += 1
+
+                if "Payload Too Large" in str(e):
+                    large_file_path = os.path.join(LARGE_MEDIA, filename)
+                    shutil.move(file_path, large_file_path)
+                    print(f"Too large: {filename}")
+                else:
+                    print(f"Failed to upload {filename}: {e}")
+
+    if uploaded_count:
+        await channel.send(f"Uploaded {uploaded_count} file(s).")
+    elif skipped_count:
+        await channel.send("No remaining files to upload. Use `!kaboom all` to resend logged files or `!kaboom reset` to clear the upload log.")
         print("\nNo Remaining Files")
+    else:
+        await channel.send("No files found in the media folder.")
+        print("\nNo Files Found")
+
+    if failed_count:
+        await channel.send(f"{failed_count} file(s) failed to upload. Check the console for details.")
 
 
 def logo():
@@ -118,7 +180,7 @@ if __name__ == '__main__':
         TOKEN = input("Discord bot token: ")
 
     print("Loaded Config: ")
-    print(f"Token: {TOKEN}\n")
+    print("Token: loaded\n")
 
     try:
         bot.run(TOKEN)
