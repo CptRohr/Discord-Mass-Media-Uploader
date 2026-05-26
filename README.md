@@ -198,6 +198,10 @@ Make sure:
 
 Update to the latest version of this project. The bot now ignores files beginning with `.`.
 
+### Uploading a file with non-English characters crashes the bot
+
+Update to the latest version of this project. The bot writes `logs.log` as UTF-8 and avoids crashing if the Windows console cannot display characters from a filename.
+
 ### A file is not uploaded
 
 The file may be too large for Discord. Check the `large` folder and the console output.

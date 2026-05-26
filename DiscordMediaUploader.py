@@ -1,6 +1,7 @@
 import datetime
 import os
 import shutil
+import sys
 import discord
 from discord.ext import commands
 import config
@@ -15,6 +16,15 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+
+def console_print(message=""):
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        encoding = sys.stdout.encoding or "utf-8"
+        safe_message = str(message).encode(encoding, errors="replace").decode(encoding)
+        print(safe_message)
 
 
 def initialize():
@@ -39,14 +49,14 @@ def prerequisite():
         os.makedirs(LARGE_MEDIA)
 
     if not os.path.exists(LOG_FILE):
-        with open(LOG_FILE, 'w') as file:
+        with open(LOG_FILE, 'w', encoding='utf-8') as file:
             file.write("----------------------------------------\n")
             file.write("        Time           Size (MB)    Name\n")
             file.write("----------------------------------------\n")
 
 
 def reset_log_file():
-    with open(LOG_FILE, 'w') as file:
+    with open(LOG_FILE, 'w', encoding='utf-8') as file:
         file.write("----------------------------------------\n")
         file.write("        Time           Size (MB)    Name\n")
         file.write("----------------------------------------\n")
@@ -55,7 +65,7 @@ def reset_log_file():
 def uploaded_filenames():
     uploaded = set()
 
-    with open(LOG_FILE, 'r') as file:
+    with open(LOG_FILE, 'r', encoding='utf-8') as file:
         for line in file:
             parts = line.rstrip().split(maxsplit=4)
             if len(parts) == 5:
@@ -77,13 +87,13 @@ def file_info(file_path):
 
 def log_uploaded_file(log_file, filename, filesize, current_time):
     log_file.write(f"{current_time} {filesize:10.2f}    {filename}\n")
-    print(f"Uploaded: {current_time} {filesize:6.2f} MB  {filename}")
+    console_print(f"Uploaded: {current_time} {filesize:6.2f} MB  {filename}")
 
 
 def move_to_large(file_path, filename):
     large_file_path = os.path.join(LARGE_MEDIA, filename)
     shutil.move(file_path, large_file_path)
-    print(f"Too large: {filename}")
+    console_print(f"Too large: {filename}")
 
 
 def chunk_files(files, chunk_size):
@@ -106,7 +116,7 @@ async def send_single_file(channel, log_file, upload):
         if "Payload Too Large" in str(e):
             move_to_large(file_path, filename)
         else:
-            print(f"Failed to upload {filename}: {e}")
+            console_print(f"Failed to upload {filename}: {e}")
 
         return False
     finally:
@@ -129,7 +139,7 @@ async def send_file_batch(channel, log_file, uploads):
 
         return len(uploads), 0
     except Exception as e:
-        print(f"Batch upload failed, retrying one by one: {e}")
+        console_print(f"Batch upload failed, retrying one by one: {e}")
 
         uploaded_count = 0
         failed_count = 0
@@ -148,26 +158,26 @@ async def send_file_batch(channel, log_file, uploads):
 
 @bot.event
 async def on_ready():
-    print('Logged in as {0.user}'.format(bot))
-    print("To start uploading, type !kaboom in the Discord channel")
+    console_print('Logged in as {0.user}'.format(bot))
+    console_print("To start uploading, type !kaboom in the Discord channel")
 
 
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
-    print(f"Received message from {message.author}: {message.content}")
+    console_print(f"Received message from {message.author}: {message.content}")
     await bot.process_commands(message)
 
 
 @bot.event
 async def on_command_error(ctx, error):
-    print(f"Command error: {getattr(ctx.command, 'name', None)} failed with: {error}")
+    console_print(f"Command error: {getattr(ctx.command, 'name', None)} failed with: {error}")
 
 
 @bot.command()
 async def kaboom(ctx, mode: str = ""):
-    print(f"kaboom command invoked by {ctx.author} in {ctx.channel}")
+    console_print(f"kaboom command invoked by {ctx.author} in {ctx.channel}")
     channel = ctx.channel
 
     mode = mode.lower()
@@ -175,7 +185,7 @@ async def kaboom(ctx, mode: str = ""):
 
     if mode in ("reset", "--reset"):
         reset_log_file()
-        print("Upload log reset")
+        console_print("Upload log reset")
         await channel.send("Upload log reset. Run `!kaboom` to upload files again.")
         return
 
@@ -207,7 +217,7 @@ async def kaboom(ctx, mode: str = ""):
             "path": file_path
         })
 
-    with open(LOG_FILE, 'a') as file:
+    with open(LOG_FILE, 'a', encoding='utf-8') as file:
         for upload_batch in chunk_files(uploads, MAX_FILES_PER_MESSAGE):
             batch_uploaded_count, batch_failed_count = await send_file_batch(channel, file, upload_batch)
             uploaded_count += batch_uploaded_count
@@ -217,37 +227,38 @@ async def kaboom(ctx, mode: str = ""):
         await channel.send(f"Uploaded {uploaded_count} file(s).")
     elif skipped_count:
         await channel.send("No remaining files to upload. Use `!kaboom all` to resend logged files or `!kaboom reset` to clear the upload log.")
-        print("\nNo Remaining Files")
+        console_print("\nNo Remaining Files")
     else:
         await channel.send("No files found in the media folder.")
-        print("\nNo Files Found")
+        console_print("\nNo Files Found")
 
     if failed_count:
         await channel.send(f"{failed_count} file(s) failed to upload. Check the console for details.")
 
 
 def logo():
-    line1 = "·▄▄▄▄  ▪  .▄▄ ·  ▄▄·       ▄▄▄  ·▄▄▄▄      • ▌ ▄ ·. ▄▄▄ .·▄▄▄▄  ▪   ▄▄▄·      ▐▄▄▄▄▄▄ .▄▄▄▄▄"
-    line2 = "██▪ ██ ██ ▐█ ▀. ▐█ ▌▪▪     ▀▄ █·██▪ ██     ·██ ▐███▪▀▄.▀·██▪ ██ ██ ▐█ ▀█       ·██▀▄.▀·•██  "
-    line3 = "▐█· ▐█▌▐█·▄▀▀▀█▄██ ▄▄ ▄█▀▄ ▐▀▀▄ ▐█· ▐█▌    ▐█ ▌▐▌▐█·▐▀▀▪▄▐█· ▐█▌▐█·▄█▀▀█     ▪▄ ██▐▀▀▪▄ ▐█.▪"
-    line4 = "██. ██ ▐█▌▐█▄▪▐█▐███▌▐█▌.▐▌▐█•█▌██. ██     ██ ██▌▐█▌▐█▄▄▌██. ██ ▐█▌▐█ ▪▐▌    ▐▌▐█▌▐█▄▄▌ ▐█▌·"
-    line5 = "▀▀▀▀▀• ▀▀▀ ▀▀▀▀ ·▀▀▀  ▀█▄▀▪.▀  ▀▀▀▀▀▀•     ▀▀  █▪▀▀▀ ▀▀▀ ▀▀▀▀▀• ▀▀▀ ▀  ▀      ▀▀▀• ▀▀▀  ▀▀▀ "
-    information = "    ⭐️ Star the Repository  |  https://github.com/Nikhil-Makwana1/DiscordMediaUploader ⭐️    "
-    credit = "    Modified by CptRohr  |  https://github.com/CptRohr    "
+    banner = [
+        " ____  _                       _   __  __          _ _         _   _       _                 _           ",
+        "|  _ \\(_)___  ___ ___  _ __ __| | |  \\/  | ___  __| (_) __ _  | | | |_ __ | | ___   __ _  __| | ___ _ __ ",
+        "| | | | / __|/ __/ _ \\| '__/ _` | | |\\/| |/ _ \\/ _` | |/ _` | | | | | '_ \\| |/ _ \\ / _` |/ _` |/ _ \\ '__|",
+        "| |_| | \\__ \\ (_| (_) | | | (_| | | |  | |  __/ (_| | | (_| | | |_| | |_) | | (_) | (_| | (_| |  __/ |   ",
+        "|____/|_|___/\\___\\___/|_|  \\__,_| |_|  |_|\\___|\\__,_|_|\\__,_|  \\___/| .__/|_|\\___/ \\__,_|\\__,_|\\___|_|   ",
+        "                                                                     |_|                                  ",
+    ]
+    information = "Star the Repository | https://github.com/Nikhil-Makwana1/DiscordMediaUploader"
+    credit = "Modified by CptRohr | https://github.com/CptRohr"
 
     console_width = shutil.get_terminal_size().columns
-    center_offset = (console_width - len(line1)) // 2
-    print()
-    print(" " * center_offset)
-    print(" " * center_offset + line1)
-    print(" " * center_offset + line2)
-    print(" " * center_offset + line3)
-    print(" " * center_offset + line4)
-    print(" " * center_offset + line5)
-    print()
-    print(" " * center_offset + information)
-    print(" " * center_offset + credit)
-    print()
+    max_width = max(len(line) for line in banner + [information, credit])
+    center_offset = max((console_width - max_width) // 2, 0)
+
+    console_print()
+    for line in banner:
+        console_print(" " * center_offset + line)
+    console_print()
+    console_print(" " * center_offset + information)
+    console_print(" " * center_offset + credit)
+    console_print()
 
 
 if __name__ == '__main__':
@@ -258,10 +269,10 @@ if __name__ == '__main__':
     if not TOKEN:
         TOKEN = input("Discord bot token: ")
 
-    print("Loaded Config: ")
-    print("Token: loaded\n")
+    console_print("Loaded Config: ")
+    console_print("Token: loaded\n")
 
     try:
         bot.run(TOKEN)
     except discord.LoginFailure:
-        print("Invalid token or bot lacks permissions.")
+        console_print("Invalid token or bot lacks permissions.")
