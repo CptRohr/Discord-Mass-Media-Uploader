@@ -111,27 +111,6 @@ Clears the upload history in `logs.log`.
 
 After this, `!kaboom` will treat files in `media` as new again.
 
-## Token Safety
-
-Never paste your real bot token into:
-
-- `config.py`
-- GitHub commits
-- Discord messages
-- Screenshots
-- README files
-
-This project reads the token from the `DISCORD_BOT_TOKEN` environment variable:
-
-```python
-TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
-```
-
-The included `config.py` is safe to commit because it does not contain a real token.
-
-If your token is ever exposed, reset it immediately in the Discord Developer Portal.
-
-You can use a local `.env` file with your own workflow if you prefer. `.env` files are ignored by Git in this project, but do not upload them manually to GitHub.
 
 ## Project Folders
 
